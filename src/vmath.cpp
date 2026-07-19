@@ -1,5 +1,7 @@
 #include "vmath.hpp"
 
+namespace neves {
+
 float rad2deg(float rad) { return rad * 180.0f / CV_PI; }
 
 float deg2rad(float deg) { return deg * CV_PI / 180.0f; }
@@ -265,3 +267,5 @@ float GetRotTheta(const Eigen::Matrix3f &R) {
 }
 
 float GetRotTheta(const Eigen::Vector3f &r) { return r.norm(); }
+
+} // namespace neves
