@@ -45,7 +45,7 @@ void PrintStats(const std::string &name, const SolveStats &stats,
 
 int main() {
   std::vector<neves::Vec3d> points;
-  constexpr int point_count = 1000;
+  constexpr int point_count = 1000000;
   points.reserve(point_count);
   for (int i = 0; i < point_count; ++i) {
     const double x = std::sin(double(i) * 0.37) * 3.0;
