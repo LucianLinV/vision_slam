@@ -23,6 +23,13 @@ using SO3 = Sophus::SO3<Scalar>;
 template <typename  Scalar>
 using SE3 = Sophus::SE3<Scalar>;
 
+using Vec3d = Vec3<double>;
+using Vec6d = Eigen::Matrix<double, 6, 1>;
+using Mat3d = Mat3<double>;
+using Mat36d = Eigen::Matrix<double, 3, 6>;
+using SO3d = SO3<double>;
+using SE3d = SE3<double>;
+
 
 float rad2deg(float rad);
 float deg2rad(float deg);
