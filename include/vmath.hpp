@@ -12,29 +12,41 @@
 #include <sophus/se3.hpp>
 #include <sophus/so3.hpp>
 namespace neves {
-template <typename  Scalar>
-using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
-template <typename  Scalar>
-using Mat3 = Eigen::Matrix<Scalar, 3, 3>;
-template <typename Scalar>
-using Quat = Eigen::Quaternion<Scalar>;
-template <typename  Scalar>
-using SO3 = Sophus::SO3<Scalar>;
-template <typename  Scalar>
-using SE3 = Sophus::SE3<Scalar>;
+template <typename Scalar> using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
+template <typename Scalar> using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
+template <typename Scalar> using Mat3 = Eigen::Matrix<Scalar, 3, 3>;
+template <typename Scalar> using Quat = Eigen::Quaternion<Scalar>;
+template <typename Scalar> using SO3 = Sophus::SO3<Scalar>;
+template <typename Scalar> using SE3 = Sophus::SE3<Scalar>;
 
 using Vec3d = Vec3<double>;
+using Vec2d = Vec2<double>;
 using Vec6d = Eigen::Matrix<double, 6, 1>;
 using Mat3d = Mat3<double>;
 using Mat36d = Eigen::Matrix<double, 3, 6>;
 using SO3d = SO3<double>;
 using SE3d = SE3<double>;
 
-
 float rad2deg(float rad);
 float deg2rad(float deg);
 
 Eigen::Matrix3f Skew(const Eigen::Vector3f &v);
+
+Eigen::Matrix3d Mat2Eigen33(const cv::Mat& R) {
+    CV_Assert(!R.empty());
+    CV_Assert(R.rows == 3 && R.cols == 3);
+    CV_Assert(R.type() == CV_64F);
+
+    Eigen::Matrix3d R_eigen;
+
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 3; ++col) {
+            R_eigen(row, col) = R.at<double>(row, col);
+        }
+    }
+
+    return R_eigen;
+}
 
 cv::Point3f pixel2camera(const cv::Point3f &pixel_p, const cv::Mat &K, float z);
 cv::Point3f camera2pixel(cv::Point3f &camera_p, const cv::Mat &K,
@@ -96,19 +108,16 @@ float GetRotTheta(const Eigen::Matrix3f &R);
 
 float GetRotTheta(const Eigen::Vector3f &r);
 
-template <typename Scalar>
-Vec3<Scalar> R2so3(const Mat3<Scalar> &R) {
+template <typename Scalar> Vec3<Scalar> R2so3(const Mat3<Scalar> &R) {
   SO3<Scalar> so3(R);
   return so3.log();
 }
 
-template <typename Scalar>
-Mat3<Scalar> so3ToR(const Vec3<Scalar> &phi) {
+template <typename Scalar> Mat3<Scalar> so3ToR(const Vec3<Scalar> &phi) {
   return SO3<Scalar>::exp(phi).matrix();
 }
 
-template <typename Scalar>
-Mat3<Scalar> so2R(const Vec3<Scalar> &phi) {
+template <typename Scalar> Mat3<Scalar> so2R(const Vec3<Scalar> &phi) {
   return so3ToR(phi);
 }
 
@@ -133,15 +142,13 @@ Vec3<Scalar> aa2so3(const Eigen::AngleAxis<Scalar> &aa) {
 }
 
 template <typename Scalar>
-Mat3<Scalar> Upso3dataLR(const Mat3<Scalar> &R_old,
-                         const Vec3<Scalar> &dphi) {
+Mat3<Scalar> Upso3dataLR(const Mat3<Scalar> &R_old, const Vec3<Scalar> &dphi) {
   SO3<Scalar> R(R_old);
   return (SO3<Scalar>::exp(dphi) * R).matrix();
 }
 
 template <typename Scalar>
-Mat3<Scalar> Upso3dataRR(const Mat3<Scalar> &R_old,
-                         const Vec3<Scalar> &dphi) {
+Mat3<Scalar> Upso3dataRR(const Mat3<Scalar> &R_old, const Vec3<Scalar> &dphi) {
   SO3<Scalar> R(R_old);
   return (R * SO3<Scalar>::exp(dphi)).matrix();
 }
@@ -161,7 +168,6 @@ Upse3dataRR(const Eigen::Matrix<Scalar, 4, 4> &T_old,
   SE3<Scalar> T(T_old);
   return (T * SE3<Scalar>::exp(dphi)).matrix();
 }
-
 
 } // namespace neves
 

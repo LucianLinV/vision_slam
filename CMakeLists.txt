@@ -38,7 +38,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ============================================================
 
 find_package(Eigen3 REQUIRED)
-find_package(OpenCV REQUIRED)
+
+set(VSLAMP_OPENCV_COMPONENTS
+    core
+    imgproc
+    imgcodecs
+    highgui
+    features2d
+    calib3d
+)
+
+find_package(OpenCV REQUIRED COMPONENTS ${VSLAMP_OPENCV_COMPONENTS})
+
+message(STATUS "OpenCV version: ${OpenCV_VERSION}")
+message(STATUS "OpenCV include directories: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
 
 # ============================================================
 # Ceres: prefer CUDA build, otherwise use CPU build
@@ -213,7 +227,8 @@ endif()
 # Other dependencies
 # ============================================================
 
-find_package(Sophus 1.24.6 EXACT REQUIRED CONFIG)
+#find_package(Sophus 1.24.6 EXACT REQUIRED CONFIG)
+find_package(Sophus REQUIRED CONFIG)
 find_package(g2o REQUIRED CONFIG)
 find_package(MPI REQUIRED COMPONENTS C)
 find_package(PCL REQUIRED COMPONENTS common io)
