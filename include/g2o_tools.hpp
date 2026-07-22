@@ -369,9 +369,30 @@ private:
   CameraParametersXY *camera_ = nullptr;
 };
 
-void bundleAdjusterment(const std::vector<Vec3d> &points3d,
-                        const std::vector<Vec2d> &points2d, const cv::Mat &K,
-                        const cv::Mat &R, const cv::Mat &t) {
+struct BundleAdjustmentResult {
+  bool success = false;
+  int iterations = 0;
+  double initial_chi2 = 0.0;
+  double final_chi2 = 0.0;
+  g2o::SE3Quat pose;
+};
+
+inline BundleAdjustmentResult
+bundleAdjusterment(const std::vector<Vec3d> &points3d,
+                   const std::vector<Vec2d> &points2d, const cv::Mat &K,
+                   const cv::Mat &R, const cv::Mat &t) {
+  BundleAdjustmentResult result;
+
+  if (points3d.size() != points2d.size()) {
+    std::cerr << "points3d and points2d size mismatch\n";
+    return result;
+  }
+
+  if (points3d.size() < 4) {
+    std::cerr << "At least four 3D-2D correspondences are required\n";
+    return result;
+  }
+
   g2o::SparseOptimizer optimizer;
   using BlockSolverType = g2o::BlockSolverX;
   using LinearSolverType =
@@ -384,7 +405,7 @@ void bundleAdjusterment(const std::vector<Vec3d> &points3d,
       new g2o::OptimizationAlgorithmLevenberg(std::move(block_solver));
 
   optimizer.setAlgorithm(algorithm);
-  optimizer.setVerbose(true);
+  optimizer.setVerbose(false);
 
   auto *camera = new CameraParametersXY(K.at<double>(0, 0), K.at<double>(1, 1),
                                         K.at<double>(0, 2), K.at<double>(1, 2));
@@ -404,7 +425,7 @@ void bundleAdjusterment(const std::vector<Vec3d> &points3d,
     auto *point = new VertexSBAPointXYZ();
     point->setId(index++);
     point->setEstimate(points3d[i]);
-    point->setMarginalized(true);
+    point->setFixed(true);
     optimizer.addVertex(point);
 
     auto* edge = new EdgeProjectXyz2UV(points2d[i]);
@@ -414,8 +435,27 @@ void bundleAdjusterment(const std::vector<Vec3d> &points3d,
     edge->setParameterId(0, 0);
     optimizer.addEdge(edge);
   }
-  optimizer.initializeOptimization();
-  optimizer.optimize(20);
+
+  if (!optimizer.initializeOptimization()) {
+    std::cerr << "Failed to initialize bundle adjustment\n";
+    return result;
+  }
+
+  optimizer.computeActiveErrors();
+  result.initial_chi2 = optimizer.activeChi2();
+
+  result.iterations = optimizer.optimize(20);
+  if (result.iterations <= 0) {
+    std::cerr << "bundle adjustment failed\n";
+    return result;
+  }
+
+  optimizer.computeActiveErrors();
+  result.final_chi2 = optimizer.activeChi2();
+  result.pose = pose->estimate();
+  result.success = true;
+
+  return result;
 }
 
 } // namespace neves

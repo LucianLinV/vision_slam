@@ -32,7 +32,7 @@ float deg2rad(float deg);
 
 Eigen::Matrix3f Skew(const Eigen::Vector3f &v);
 
-Eigen::Matrix3d Mat2Eigen33(const cv::Mat& R) {
+inline Eigen::Matrix3d Mat2Eigen33(const cv::Mat& R) {
     CV_Assert(!R.empty());
     CV_Assert(R.rows == 3 && R.cols == 3);
     CV_Assert(R.type() == CV_64F);

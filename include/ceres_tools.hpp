@@ -3,6 +3,7 @@
 
 #include "vmath.hpp"
 
+#include <array>
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/problem.h>
 #include <cstddef>
@@ -118,6 +119,94 @@ inline SE3d SolveSe3WithCeres(const SE3d &init_T,
     problem.AddResidualBlock(
         Se3PointResidual::Create(points[i], observations[i]), nullptr, R.data(),
         translation.data());
+  }
+
+  ceres::Solver::Options options;
+  options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+  options.linear_solver_type = ceres::DENSE_QR;
+  options.max_num_iterations = 20;
+  options.minimizer_progress_to_stdout = false;
+
+  ceres::Solver::Summary summary;
+  ceres::Solve(options, &problem, &summary);
+
+  if (!summary.IsSolutionUsable()) {
+    throw std::runtime_error("Ceres failed: " + summary.BriefReport());
+  }
+
+  return SE3d(R, translation);
+}
+
+struct BAPointResidual {
+  BAPointResidual(const Vec3d &point, const Vec2d &observation,
+                  const std::array<double, 9> &cam)
+      : point_(point), observation_(observation), fx_(cam.at(0)),
+        fy_(cam.at(4)), cx_(cam.at(2)), cy_(cam.at(5)) {}
+
+  template <typename T>
+  bool operator()(const T *const quaternion_xyzw, const T *const trans_xyz,
+                  T *residuals) const {
+    Eigen::Map<const Quat<T>> quaternion(quaternion_xyzw);
+    const SO3<T> R(quaternion);
+
+    Eigen::Map<const Vec3<T>> translation(trans_xyz);
+
+    const Vec3<T> point_camera = R * point_.template cast<T>() + translation;
+
+    const T X = point_camera.x();
+    const T Y = point_camera.y();
+    const T Z = point_camera.z();
+
+    const T predicted_u = T(fx_) * X / Z + T(cx_);
+
+    const T predicted_v = T(fy_) * Y / Z + T(cy_);
+
+    // 预测像素 - 实际观测像素
+    residuals[0] = predicted_u - T(observation_.x());
+
+    residuals[1] = predicted_v - T(observation_.y());
+    return true;
+  }
+
+  static ceres::CostFunction *Create(const Vec3d &point,
+                                     const Vec2d &observation,
+                                     const std::array<double, 9> &cam) {
+    return new ceres::AutoDiffCostFunction<BAPointResidual, 2, 4, 3>(
+        new BAPointResidual(point, observation, cam));
+  }
+
+  Vec3d point_;
+  Vec2d observation_;
+  double fx_;
+  double fy_;
+  double cx_;
+  double cy_;
+};
+
+inline SE3d SolveBA32(const SE3d &init_T, const std::vector<Vec3d> &points,
+                      const std::vector<Vec2d> &observations,
+                      const std::array<double, 9> &cam) {
+  if (points.size() != observations.size()) {
+    throw std::invalid_argument("points and observations size mismatch");
+  }
+
+  if (points.size() < 3) {
+    throw std::invalid_argument(
+        "At least three non-collinear point pairs are required");
+  }
+
+  SO3d R = init_T.so3();
+  Vec3d translation = init_T.translation();
+
+  ceres::Problem problem;
+  problem.AddParameterBlock(R.data(), SO3d::num_parameters);
+  problem.SetManifold(R.data(), new ceres::EigenQuaternionManifold());
+  problem.AddParameterBlock(translation.data(), 3);
+
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    problem.AddResidualBlock(
+        BAPointResidual::Create(points[i], observations[i], cam), nullptr,
+        R.data(), translation.data());
   }
 
   ceres::Solver::Options options;
