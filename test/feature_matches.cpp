@@ -13,7 +13,7 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/imgcodecs.hpp>
 
-namespace {
+namespace neves{
 
 std::filesystem::path ProjectRoot() {
   return std::filesystem::path(__FILE__).parent_path().parent_path();
@@ -39,6 +39,7 @@ void PrintFeatureMatchStats(const FeatureMatchStats &stats, int repeat_count) {
 } // namespace
 
 int main() {
+  using namespace neves;
   std::cout << std::setprecision(12);
 
   const auto source_dir = ProjectRoot() / "sources";

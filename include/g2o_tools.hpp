@@ -428,7 +428,7 @@ bundleAdjusterment(const std::vector<Vec3d> &points3d,
     point->setFixed(true);
     optimizer.addVertex(point);
 
-    auto* edge = new EdgeProjectXyz2UV(points2d[i]);
+    auto *edge = new EdgeProjectXyz2UV(points2d[i]);
     edge->setVertex(0, point);
     edge->setVertex(1, pose);
     edge->setInformation(Eigen::Matrix2d::Identity());
@@ -456,6 +456,169 @@ bundleAdjusterment(const std::vector<Vec3d> &points3d,
   result.success = true;
 
   return result;
+}
+
+// 直接法
+class EdgeSE3ProjectDirect
+    : public g2o::BaseUnaryEdge<1, double, VertexSE3Expmap> {
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeSE3ProjectDirect(const Vec3d &point, cv::Mat *img)
+      : x_world_(point), image_(img) {
+    resizeParameters(1);
+    installParameter(camera_, 0);
+  }
+
+  // explicit EdgeSE3ProjectDirect(const Vec2d &measurement) :
+  // EdgeSE3ProjectDirect() {
+  //   setMeasurement(measurement);
+  // }
+
+  void computeError() override {
+    const VertexSE3Expmap *v =
+        static_cast<const VertexSE3Expmap *>(_vertices[0]);
+    Eigen::Vector3d x_local = v->estimate().map(x_world_);
+    const auto *cam = static_cast<const CameraParametersXY *>(parameter(0));
+    float x = x_local[0] * cam->fx / x_local[2] + cam->cx;
+    float y = x_local[1] * cam->fy / x_local[2] + cam->cy;
+    if (x - 4 < 0 || (x + 4) > image_->cols || (y - 4) < 0 ||
+        (y + 4) > image_->rows) {
+      _error(0, 0) = 0.0;
+      this->setLevel(1);
+    } else {
+      _error(0, 0) = GetPixelValue(x, y) - _measurement;
+    }
+  }
+
+  void linearizeOplus() override {
+    if (level() == 1) {
+      _jacobianOplusXi = Eigen::Matrix<double, 1, 6>::Zero();
+      return;
+    }
+
+    VertexSE3Expmap *vj = static_cast<VertexSE3Expmap *>(_vertices[0]);
+    g2o::SE3Quat Tcw(vj->estimate());
+    Vec3d xyz_t = Tcw.map(x_world_);
+    double x = xyz_t[0];
+    double y = xyz_t[1];
+    double z = xyz_t[2];
+
+    const auto *cam = static_cast<const CameraParametersXY *>(parameter(0));
+    const double inv_z = 1.0 / z;
+    const double inv_z2 = inv_z * inv_z;
+
+    // 这里就是你要单独取出的两个值
+    const double fx_z = cam->fx * inv_z;
+    const double fy_z = cam->fy * inv_z;
+
+    float u = x * fx_z + cam->cx;
+    float v = y * fy_z + cam->cy;
+
+    Eigen::Matrix<double, 2, 3> tmp;
+
+    tmp(0, 0) = fx_z;
+    tmp(0, 1) = 0.0;
+    tmp(0, 2) = -x / z * fx_z;
+
+    tmp(1, 0) = 0.0;
+    tmp(1, 1) = fy_z;
+    tmp(1, 2) = -y / z * fy_z;
+    Eigen::Matrix<double, 3, 6> J_point_pose;
+
+    J_point_pose.rightCols<3>().setIdentity();
+    J_point_pose.leftCols<3>() = -SO3d::hat(xyz_t);
+
+    Eigen::Matrix<double, 1, 2> j_pixel_uv;
+    j_pixel_uv(0, 0) = (GetPixelValue(u + 1, v) - GetPixelValue(u - 1, v)) / 2.;
+    j_pixel_uv(0, 1) = (GetPixelValue(u, v + 1) - GetPixelValue(u, v - 1)) / 2;
+    _jacobianOplusXi = j_pixel_uv * (tmp * J_point_pose);
+  }
+
+  bool read(std::istream &) override { return false; }
+  bool write(std::ostream &) const override { return false; }
+
+private:
+  inline float GetPixelValue(float x, float y) {
+    CV_Assert(image_->type() == CV_8UC1);
+
+    if (x < 0.0f || y < 0.0f || x >= static_cast<float>(image_->cols - 1) ||
+        y >= static_cast<float>(image_->rows - 1)) {
+      return 0.0f;
+    }
+
+    const int x0 = static_cast<int>(std::floor(x));
+    const int y0 = static_cast<int>(std::floor(y));
+
+    const float dx = x - static_cast<float>(x0);
+    const float dy = y - static_cast<float>(y0);
+
+    const uchar *row0 = image_->ptr<uchar>(y0);
+    const uchar *row1 = image_->ptr<uchar>(y0 + 1);
+
+    const float i00 = static_cast<float>(row0[x0]);
+    const float i10 = static_cast<float>(row0[x0 + 1]);
+    const float i01 = static_cast<float>(row1[x0]);
+    const float i11 = static_cast<float>(row1[x0 + 1]);
+
+    return (1.0f - dx) * (1.0f - dy) * i00 + dx * (1.0f - dy) * i10 +
+           (1.0f - dx) * dy * i01 + dx * dy * i11;
+  }
+
+private:
+  Vec3d x_world_;
+  cv::Mat *image_ = nullptr;
+  CameraParametersXY *camera_ = nullptr;
+};
+
+void SolverSE3ProjectDirect(const std::vector<Vec3d> &points3d,
+                            const std::vector<double> &reference_intensity,
+                            cv::Mat &img, const cv::Mat &K, const cv::Mat &R,
+                            const cv::Mat &t) {
+  g2o::SparseOptimizer optimizer;
+  using BlockSolverType = g2o::BlockSolverX;
+  using LinearSolverType =
+      g2o::LinearSolverDense<BlockSolverType::PoseMatrixType>;
+
+  auto linear_solver = std::make_unique<LinearSolverType>();
+  auto block_solver =
+      std::make_unique<BlockSolverType>(std::move(linear_solver));
+  auto algorithm =
+      new g2o::OptimizationAlgorithmLevenberg(std::move(block_solver));
+
+  optimizer.setAlgorithm(algorithm);
+  optimizer.setVerbose(true);
+
+  auto *camera = new CameraParametersXY(K.at<double>(0, 0), K.at<double>(1, 1),
+                                        K.at<double>(0, 2), K.at<double>(1, 2));
+
+  camera->setId(0);
+  optimizer.addParameter(camera);
+
+  Eigen::Matrix3d R_eigen = Mat2Eigen33(R);
+  Eigen::Vector3d t_eigen(t.at<double>(0), t.at<double>(1), t.at<double>(2));
+
+  auto *pose = new VertexSE3Expmap();
+  pose->setId(0);
+  pose->setEstimate(g2o::SE3Quat(R_eigen, t_eigen));
+  optimizer.addVertex(pose);
+  for (size_t i = 0; i < points3d.size(); ++i) {
+    auto *edge = new EdgeSE3ProjectDirect(points3d[i], &img);
+    edge->setVertex(0, pose);
+    edge->setMeasurement(reference_intensity[i]);
+    edge->setInformation(Eigen::Matrix<double, 1, 1>::Identity());
+    edge->setParameterId(0, 0);
+    optimizer.addEdge(edge);
+  }
+  // auto *edge = new EdgeSE3ProjectDirect(points3d, &img);
+  // edge->setVertex(0, pose);
+  // edge->setMeasurement(reference_intensity);
+  // edge->setInformation(Eigen::Matrix<double, 1, 1>::Identity());
+  // edge->setParameterId(0, 0);
+  // optimizer.addEdge(edge);
+
+  optimizer.initializeOptimization();
+  optimizer.optimize(20);
 }
 
 } // namespace neves

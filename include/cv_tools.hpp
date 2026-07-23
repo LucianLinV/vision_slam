@@ -9,6 +9,9 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/calib3d.hpp>
+namespace neves {
+
+
 
 inline void FindOrb(const cv::Mat &img1, const cv::Mat &img2,
                     std::vector<cv::KeyPoint> &kp1,
@@ -123,4 +126,6 @@ void PoseEstimation2d2d(std::vector<cv::KeyPoint> keypoints_1,
                   principal_point);
   std::cout << "R is " << std::endl << R << std::endl;
   std::cout << "t is " << std::endl << T << std::endl;
+}
+
 }

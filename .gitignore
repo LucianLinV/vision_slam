@@ -66,6 +66,10 @@ vcpkg_installed/
 # Test output
 Testing/
 
+# Local datasets
+sources/TUM/
+*.tgz
+
 # OS files
 .DS_Store
 Thumbs.db
