@@ -69,12 +69,12 @@ public:
       return false;
     }
 
-    Vec3d p_cam = camera_->world2camera(pt_world, T_c_w_);
+    Vec3d p_cam = camera_->World2Camera(pt_world, T_c_w_);
     if (p_cam.z() <= 0.0) {
       return false;
     }
 
-    Vec2d pixel = camera_->world2pixel(pt_world, T_c_w_);
+    Vec2d pixel = camera_->World2Pixel(pt_world, T_c_w_);
     return pixel.x() >= 0.0 && pixel.y() >= 0.0 &&
            pixel.x() < static_cast<double>(color_.cols) &&
            pixel.y() < static_cast<double>(color_.rows);
@@ -87,6 +87,8 @@ public:
   Camera::Ptr camera_;
   cv::Mat color_, depth_;
 };
+
+
 
 } // namespace neves
 

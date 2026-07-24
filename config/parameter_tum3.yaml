@@ -1,0 +1,46 @@
+%YAML:1.0
+
+# 相机内参，TUM rgbd_dataset_freiburg2_xyz 使用 Freiburg 2 RGB 参数。
+camera.fx: 520.9
+camera.fy: 521.0
+camera.cx: 325.1
+camera.cy: 249.7
+camera.depth_scale: 5000.0
+
+# 数据集路径。
+dataset.root: "./sources/TUM3/rgbd_dataset_freiburg2_xyz"
+dataset.association_file: "./sources/TUM3/rgbd_dataset_freiburg2_xyz/associate.txt"
+
+# 特征提取和匹配参数。
+feature.detector: "FAST"
+feature.fast_threshold: 20
+feature.max_features: 1000
+feature.min_distance: 20
+feature.orb_features: 500
+feature.match_ratio: 0.8
+
+# 跟踪状态统计。
+tracking.num_inliers: 0
+tracking.num_lost: 0
+
+# 跟踪和特征金字塔参数。
+tracking.num_of_features: 1000
+tracking.scale_factor: 1.2
+tracking.level_pyramid: 8
+tracking.match_ratio: 0.8
+tracking.max_num_lost: 15
+tracking.min_inliers: 30
+
+# 关键帧插入阈值。
+keyframe.min_rot: 0.1
+keyframe.min_trans: 0.1
+
+# 稀疏直接法参数。
+direct.patch_half_size: 2
+direct.max_iterations: 20
+direct.min_depth: 0.1
+direct.max_depth: 10.0
+
+# Bundle Adjustment 参数。
+ba.max_iterations: 20
+ba.robust_kernel_delta: 1.0

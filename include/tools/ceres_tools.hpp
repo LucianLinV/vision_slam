@@ -1,9 +1,10 @@
 #ifndef CERES_TOOLS_HPP
 #define CERES_TOOLS_HPP
 
-#include "vmath.hpp"
+#include "math/vmath.hpp"
 
 #include <array>
+#include <ceres/ceres.h>
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/problem.h>
 #include <cstddef>

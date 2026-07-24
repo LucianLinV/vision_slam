@@ -1,7 +1,6 @@
-#ifndef TOOLS_HPP
-#define TOOLS_HPP
+#ifndef TOOLS_FORWARD_HPP
+#define TOOLS_FORWARD_HPP
 
-#include "ceres_tools.hpp"
-#include "g2o_tools.hpp"
+#include "tools/tools.hpp"
 
 #endif

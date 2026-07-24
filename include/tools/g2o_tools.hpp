@@ -1,7 +1,7 @@
 #ifndef G2O_TOOLS_HPP
 #define G2O_TOOLS_HPP
 
-#include "vmath.hpp"
+#include "math/vmath.hpp"
 
 #include <cstddef>
 #include <g2o/core/base_binary_edge.h>
@@ -15,6 +15,7 @@
 #include <g2o/types/slam3d/se3quat.h>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace neves {
@@ -369,28 +370,16 @@ private:
   CameraParametersXY *camera_ = nullptr;
 };
 
-struct BundleAdjustmentResult {
-  bool success = false;
-  int iterations = 0;
-  double initial_chi2 = 0.0;
-  double final_chi2 = 0.0;
-  g2o::SE3Quat pose;
-};
-
-inline BundleAdjustmentResult
-bundleAdjusterment(const std::vector<Vec3d> &points3d,
-                   const std::vector<Vec2d> &points2d, const cv::Mat &K,
-                   const cv::Mat &R, const cv::Mat &t) {
-  BundleAdjustmentResult result;
-
+inline SE3d bundleAdjusterment(const std::vector<Vec3d> &points3d,
+                               const std::vector<Vec2d> &points2d,
+                               const cv::Mat &K, const SE3d &init_T) {
   if (points3d.size() != points2d.size()) {
-    std::cerr << "points3d and points2d size mismatch\n";
-    return result;
+    throw std::invalid_argument("points3d and points2d size mismatch");
   }
 
   if (points3d.size() < 4) {
-    std::cerr << "At least four 3D-2D correspondences are required\n";
-    return result;
+    throw std::invalid_argument(
+        "At least four 3D-2D correspondences are required");
   }
 
   g2o::SparseOptimizer optimizer;
@@ -413,12 +402,10 @@ bundleAdjusterment(const std::vector<Vec3d> &points3d,
   camera->setId(0);
   optimizer.addParameter(camera);
 
-  Eigen::Matrix3d R_eigen = Mat2Eigen33(R);
-  Eigen::Vector3d t_eigen(t.at<double>(0), t.at<double>(1), t.at<double>(2));
-
   auto *pose = new VertexSE3Expmap();
   pose->setId(0);
-  pose->setEstimate(g2o::SE3Quat(R_eigen, t_eigen));
+  pose->setEstimate(
+      g2o::SE3Quat(init_T.rotationMatrix(), init_T.translation()));
   optimizer.addVertex(pose);
   int index = 1;
   for (size_t i = 0; i < points3d.size(); ++i) {
@@ -438,24 +425,35 @@ bundleAdjusterment(const std::vector<Vec3d> &points3d,
 
   if (!optimizer.initializeOptimization()) {
     std::cerr << "Failed to initialize bundle adjustment\n";
-    return result;
+    return init_T;
   }
 
   optimizer.computeActiveErrors();
-  result.initial_chi2 = optimizer.activeChi2();
+  const double initial_chi2 = optimizer.activeChi2();
 
-  result.iterations = optimizer.optimize(20);
-  if (result.iterations <= 0) {
+  const int iterations = optimizer.optimize(20);
+  if (iterations <= 0) {
     std::cerr << "bundle adjustment failed\n";
-    return result;
+    return init_T;
   }
 
   optimizer.computeActiveErrors();
-  result.final_chi2 = optimizer.activeChi2();
-  result.pose = pose->estimate();
-  result.success = true;
+  const double final_chi2 = optimizer.activeChi2();
+  std::cout << "bundle adjustment iterations: " << iterations << std::endl;
+  std::cout << "bundle adjustment initial chi2: " << initial_chi2 << std::endl;
+  std::cout << "bundle adjustment final chi2: " << final_chi2 << std::endl;
 
-  return result;
+  const g2o::SE3Quat estimate = pose->estimate();
+  return SE3d(estimate.rotation().toRotationMatrix(), estimate.translation());
+}
+
+inline SE3d bundleAdjusterment(const std::vector<Vec3d> &points3d,
+                               const std::vector<Vec2d> &points2d,
+                               const cv::Mat &K, const cv::Mat &R,
+                               const cv::Mat &t) {
+  const SE3d init_T(Mat2Eigen33(R),
+                   Vec3d(t.at<double>(0), t.at<double>(1), t.at<double>(2)));
+  return bundleAdjusterment(points3d, points2d, K, init_T);
 }
 
 // 直接法

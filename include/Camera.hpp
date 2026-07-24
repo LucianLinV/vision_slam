@@ -6,7 +6,7 @@
 
 #include <opencv2/core.hpp>
 
-#include "vmath.hpp"
+#include "math/vmath.hpp"
 
 namespace neves {
 
@@ -38,31 +38,55 @@ public:
 
     double depthScale() const { return depth_scale_; }
 
-    Vec3d pixel2camera(const Vec2d &pixel, double depth) const {
+    Vec3d Pixel2Camera(const Vec2d &pixel, double depth) const {
         return Vec3d((pixel.x() - cx()) * depth / fx(),
                      (pixel.y() - cy()) * depth / fy(),
                      depth);
     }
 
-    Vec2d camera2pixel(const Vec3d &point_camera) const {
+    Vec2d Camera2Pixel(const Vec3d &point_camera) const {
         return Vec2d(fx() * point_camera.x() / point_camera.z() + cx(),
                      fy() * point_camera.y() / point_camera.z() + cy());
     }
 
-    Vec3d camera2world(const Vec3d &point_camera, const SE3d &Tcw) const {
+    Vec3d Camera2World(const Vec3d &point_camera, const SE3d &Tcw) const {
         return Tcw.inverse() * point_camera;
     }
 
-    Vec3d world2camera(const Vec3d &point_world, const SE3d &Tcw) const {
+    Vec3d World2Camera(const Vec3d &point_world, const SE3d &Tcw) const {
         return Tcw * point_world;
     }
 
+    Vec3d Pixel2World(const Vec2d &pixel, double depth, const SE3d &Tcw) const {
+        return Camera2World(Pixel2Camera(pixel, depth), Tcw);
+    }
+
+    Vec2d World2Pixel(const Vec3d &point_world, const SE3d &Tcw) const {
+        return Camera2Pixel(World2Camera(point_world, Tcw));
+    }
+
+    Vec3d pixel2camera(const Vec2d &pixel, double depth) const {
+        return Pixel2Camera(pixel, depth);
+    }
+
+    Vec2d camera2pixel(const Vec3d &point_camera) const {
+        return Camera2Pixel(point_camera);
+    }
+
+    Vec3d camera2world(const Vec3d &point_camera, const SE3d &Tcw) const {
+        return Camera2World(point_camera, Tcw);
+    }
+
+    Vec3d world2camera(const Vec3d &point_world, const SE3d &Tcw) const {
+        return World2Camera(point_world, Tcw);
+    }
+
     Vec3d pixel2world(const Vec2d &pixel, double depth, const SE3d &Tcw) const {
-        return camera2world(pixel2camera(pixel, depth), Tcw);
+        return Pixel2World(pixel, depth, Tcw);
     }
 
     Vec2d world2pixel(const Vec3d &point_world, const SE3d &Tcw) const {
-        return camera2pixel(world2camera(point_world, Tcw));
+        return World2Pixel(point_world, Tcw);
     }
 
     double depthRawToMeters(double depth_raw) const {
@@ -85,9 +109,5 @@ public:
 };
 
 } // namespace neves
-
-namespace neves {
-using Camera = neves::Camera;
-}
 
 #endif

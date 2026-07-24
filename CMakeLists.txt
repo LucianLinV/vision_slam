@@ -46,6 +46,7 @@ set(VSLAMP_OPENCV_COMPONENTS
     highgui
     features2d
     calib3d
+    viz
 )
 
 find_package(OpenCV REQUIRED COMPONENTS ${VSLAMP_OPENCV_COMPONENTS})
@@ -241,17 +242,15 @@ include(CTest)
 # Project library and executables
 # ============================================================
 
-add_library(vslamp_core
-    src/vmath.cpp
-)
+add_library(vslamp_core INTERFACE)
 
-target_include_directories(vslamp_core PUBLIC
+target_include_directories(vslamp_core INTERFACE
     "${PROJECT_SOURCE_DIR}/include"
     ${OpenCV_INCLUDE_DIRS}
     ${PCL_INCLUDE_DIRS}
 )
 
-target_link_libraries(vslamp_core PUBLIC
+target_link_libraries(vslamp_core INTERFACE
     Eigen3::Eigen
     Ceres::ceres
     Sophus::Sophus
@@ -270,12 +269,12 @@ target_link_libraries(vslamp_core PUBLIC
 # 将检测结果传递给 C++。
 if(VSLAMP_CERES_HAS_CUDA)
     target_compile_definitions(
-        vslamp_core PUBLIC
+        vslamp_core INTERFACE
         VSLAMP_CERES_HAS_CUDA=1
     )
 else()
     target_compile_definitions(
-        vslamp_core PUBLIC
+        vslamp_core INTERFACE
         VSLAMP_CERES_HAS_CUDA=0
     )
 endif()

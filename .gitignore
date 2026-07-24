@@ -67,7 +67,7 @@ vcpkg_installed/
 Testing/
 
 # Local datasets
-sources/TUM/
+sources/TUM*/
 *.tgz
 
 # OS files
